@@ -178,6 +178,7 @@ define_maps! { <'tcx>
     [] fn typeck_item_bodies: typeck_item_bodies_dep_node(CrateNum) -> CompileResult,
 
     [] fn typeck_tables_of: TypeckTables(DefId) -> &'tcx ty::TypeckTables<'tcx>,
+    [] fn used_traits_imports: UnusedTraitsImports(DefId) -> Rc<DefIdSet>,
 
     [] fn has_typeck_tables: HasTypeckTables(DefId) -> bool,
 

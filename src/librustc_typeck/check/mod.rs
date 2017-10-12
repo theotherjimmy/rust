@@ -741,6 +741,7 @@ pub fn provide(providers: &mut Providers) {
         closure_kind,
         generator_sig,
         adt_destructor,
+        used_traits_imports,
         ..*providers
     };
 }
@@ -918,6 +919,13 @@ fn typeck_tables_of<'a, 'tcx>(tcx: TyCtxt<'a, 'tcx, 'tcx>,
     assert_eq!(tables.local_id_root,
                Some(DefId::local(tcx.hir.definitions().node_to_hir_id(id).owner)));
     tables
+}
+
+fn used_traits_imports<'a, 'tcx>(
+    tcx: TyCtxt<'a, 'tcx, 'tcx>,
+    def_id: DefId)
+    -> &'tcx ty::TypeckTables<'tcx> {
+    Rc::new(tcx.typeck_tables_of(key).used_trait_imports.clone());
 }
 
 fn check_abi<'a, 'tcx>(tcx: TyCtxt<'a, 'tcx, 'tcx>, span: Span, abi: Abi) {
