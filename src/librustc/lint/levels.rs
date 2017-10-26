@@ -17,7 +17,8 @@ use lint::builtin;
 use lint::context::CheckLintNameResult;
 use lint::{self, Lint, LintId, Level, LintSource};
 use rustc_data_structures::stable_hasher::{HashStable, ToStableHashKey,
-                                           StableHasher, StableHasherResult};
+                                           StableHasher, StableHasherResult,
+                                           HashDebuggingContext};
 use session::Session;
 use syntax::ast;
 use syntax::attr;
@@ -432,7 +433,7 @@ impl<'gcx> HashStable<StableHashingContext<'gcx>> for LintLevelMap {
     }
 }
 
-impl<HCX> HashStable<HCX> for LintId {
+impl<HCX: HashDebuggingContext> HashStable<HCX> for LintId {
     #[inline]
     fn hash_stable<W: StableHasherResult>(&self,
                                           hcx: &mut HCX,
@@ -441,7 +442,7 @@ impl<HCX> HashStable<HCX> for LintId {
     }
 }
 
-impl<HCX> ToStableHashKey<HCX> for LintId {
+impl<HCX: HashDebuggingContext> ToStableHashKey<HCX> for LintId {
     type KeyType = &'static str;
 
     #[inline]

@@ -13,8 +13,8 @@
 
 use ich::{StableHashingContext, NodeIdHashingMode};
 use rustc_data_structures::stable_hasher::{HashStable, ToStableHashKey,
-                                           StableHasher, StableHasherResult};
-use std::hash as std_hash;
+                                           StableHasher, StableHasherResult,
+                                           HashDebuggingContext};
 use std::mem;
 use middle::region;
 use traits;
@@ -250,9 +250,9 @@ impl<'gcx> HashStable<StableHashingContext<'gcx>> for ty::Predicate<'gcx> {
 
 impl<'gcx> HashStable<StableHashingContext<'gcx>> for ty::AdtFlags {
     fn hash_stable<W: StableHasherResult>(&self,
-                                          _: &mut StableHashingContext<'gcx>,
+                                          hcx: &mut StableHashingContext<'gcx>,
                                           hasher: &mut StableHasher<W>) {
-        std_hash::Hash::hash(self, hasher);
+        hcx.hash_and_debug(self, hasher);
     }
 }
 

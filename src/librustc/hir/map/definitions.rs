@@ -20,7 +20,7 @@ use hir::def_id::{CrateNum, DefId, DefIndex, LOCAL_CRATE, DefIndexAddressSpace,
 use ich::Fingerprint;
 use rustc_data_structures::fx::FxHashMap;
 use rustc_data_structures::indexed_vec::IndexVec;
-use rustc_data_structures::stable_hasher::StableHasher;
+use rustc_data_structures::stable_hasher::StableHasherWithoutDebug;
 use serialize::{Encodable, Decodable, Encoder, Decoder};
 use std::fmt::Write;
 use std::hash::Hash;
@@ -190,7 +190,7 @@ pub struct DefKey {
 
 impl DefKey {
     fn compute_stable_hash(&self, parent_hash: DefPathHash) -> DefPathHash {
-        let mut hasher = StableHasher::new();
+        let mut hasher = StableHasherWithoutDebug::new();
 
         // We hash a 0u8 here to disambiguate between regular DefPath hashes,
         // and the special "root_parent" below.
@@ -232,7 +232,7 @@ impl DefKey {
     }
 
     fn root_parent_stable_hash(crate_name: &str, crate_disambiguator: &str) -> DefPathHash {
-        let mut hasher = StableHasher::new();
+        let mut hasher = StableHasherWithoutDebug::new();
         // Disambiguate this from a regular DefPath hash,
         // see compute_stable_hash() above.
         1u8.hash(&mut hasher);

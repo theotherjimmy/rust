@@ -11,7 +11,7 @@
 use bitvec::BitMatrix;
 use fx::FxHashMap;
 use rustc_serialize::{Encodable, Encoder, Decodable, Decoder};
-use stable_hasher::{HashStable, StableHasher, StableHasherResult};
+use stable_hasher::{HashStable, StableHasher, StableHasherResult, HashDebuggingContext};
 use std::cell::RefCell;
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -386,7 +386,8 @@ impl<T> Decodable for TransitiveRelation<T>
 }
 
 impl<CTX, T> HashStable<CTX> for TransitiveRelation<T>
-    where T: HashStable<CTX> + Eq + Debug + Clone + Hash
+    where T: HashStable<CTX> + Eq + Debug + Clone + Hash,
+          CTX: HashDebuggingContext
 {
     fn hash_stable<W: StableHasherResult>(&self,
                                           hcx: &mut CTX,
@@ -407,7 +408,7 @@ impl<CTX, T> HashStable<CTX> for TransitiveRelation<T>
     }
 }
 
-impl<CTX> HashStable<CTX> for Edge {
+impl<CTX: HashDebuggingContext> HashStable<CTX> for Edge {
     fn hash_stable<W: StableHasherResult>(&self,
                                           hcx: &mut CTX,
                                           hasher: &mut StableHasher<W>) {
@@ -421,7 +422,7 @@ impl<CTX> HashStable<CTX> for Edge {
     }
 }
 
-impl<CTX> HashStable<CTX> for Index {
+impl<CTX: HashDebuggingContext> HashStable<CTX> for Index {
     fn hash_stable<W: StableHasherResult>(&self,
                                           hcx: &mut CTX,
                                           hasher: &mut StableHasher<W>) {

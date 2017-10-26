@@ -9,7 +9,8 @@
 // except according to those terms.
 
 use rustc_data_structures::stable_hasher::{HashStable, StableHasher,
-                                           StableHashingContextProvider};
+                                           StableHashingContextProvider,
+                                           StableHasherWithoutDebug};
 use rustc_data_structures::fx::{FxHashMap, FxHashSet};
 use rustc_data_structures::indexed_vec::{Idx, IndexVec};
 use std::cell::{Ref, RefCell};
@@ -684,7 +685,7 @@ impl CurrentDepGraph {
         let duration = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
         let nanos = duration.as_secs() * 1_000_000_000 +
                     duration.subsec_nanos() as u64;
-        let mut stable_hasher = StableHasher::new();
+        let mut stable_hasher = StableHasherWithoutDebug::new();
         nanos.hash(&mut stable_hasher);
 
         let forbidden_edge = if cfg!(debug_assertions) {
@@ -758,7 +759,7 @@ impl CurrentDepGraph {
             reads
         } = popped_node {
             let mut fingerprint = self.anon_id_seed;
-            let mut hasher = StableHasher::new();
+            let mut hasher = StableHasherWithoutDebug::new();
 
             for &read in reads.iter() {
                 let read_dep_node = self.nodes[read];

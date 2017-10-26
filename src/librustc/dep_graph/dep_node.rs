@@ -67,7 +67,7 @@ use hir::{HirId, ItemLocalId};
 use ich::Fingerprint;
 use ty::{TyCtxt, Instance, InstanceDef, ParamEnv, ParamEnvAnd, PolyTraitRef, Ty};
 use ty::subst::Substs;
-use rustc_data_structures::stable_hasher::{StableHasher, HashStable};
+use rustc_data_structures::stable_hasher::{StableHasher, HashStable, StableHasherWithoutDebug};
 use ich::StableHashingContext;
 use std::fmt;
 use std::hash::Hash;
@@ -768,7 +768,7 @@ pub struct WorkProductId {
 
 impl WorkProductId {
     pub fn from_cgu_name(cgu_name: &str) -> WorkProductId {
-        let mut hasher = StableHasher::new();
+        let mut hasher = StableHasherWithoutDebug::new();
         cgu_name.len().hash(&mut hasher);
         cgu_name.hash(&mut hasher);
         WorkProductId {

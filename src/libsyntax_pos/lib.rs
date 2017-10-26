@@ -35,7 +35,7 @@ use std::ops::{Add, Sub};
 use std::path::PathBuf;
 use std::rc::Rc;
 
-use rustc_data_structures::stable_hasher::StableHasher;
+use rustc_data_structures::stable_hasher::StableHasherWithoutDebug;
 
 extern crate rustc_data_structures;
 
@@ -664,7 +664,7 @@ impl FileMap {
                start_pos: BytePos) -> FileMap {
         remove_bom(&mut src);
 
-        let mut hasher: StableHasher<u128> = StableHasher::new();
+        let mut hasher: StableHasherWithoutDebug<u128> = StableHasherWithoutDebug::new();
         hasher.write(src.as_bytes());
         let src_hash = hasher.finish();
 
@@ -713,7 +713,7 @@ impl FileMap {
             let src = get_src();
             let mut external_src = self.external_src.borrow_mut();
             if let Some(src) = src {
-                let mut hasher: StableHasher<u128> = StableHasher::new();
+                let mut hasher: StableHasherWithoutDebug<u128> = StableHasherWithoutDebug::new();
                 hasher.write(src.as_bytes());
 
                 if hasher.finish() == self.src_hash {

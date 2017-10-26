@@ -31,25 +31,27 @@ use sip128::SipHasher128;
 /// This hasher currently always uses the stable Blake2b algorithm
 /// and allows for variable output lengths through its type
 /// parameter.
-pub struct StableHasher<W> {
+pub struct StableHasherWithoutDebug<W> {
     state: SipHasher128,
     bytes_hashed: u64,
     width: PhantomData<W>,
 }
 
+pub struct StableHasher<W>(StableHasherWithoutDebug<W>);
+
 impl<W: StableHasherResult> ::std::fmt::Debug for StableHasher<W> {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        write!(f, "{:?}", self.state)
+        write!(f, "{:?}", self.0.state)
     }
 }
 
 pub trait StableHasherResult: Sized {
-    fn finish(hasher: StableHasher<Self>) -> Self;
+    fn finish(hasher: StableHasherWithoutDebug<Self>) -> Self;
 }
 
-impl<W: StableHasherResult> StableHasher<W> {
+impl<W: StableHasherResult> StableHasherWithoutDebug<W>{
     pub fn new() -> Self {
-        StableHasher {
+        StableHasherWithoutDebug {
             state: SipHasher128::new_with_keys(0, 0),
             bytes_hashed: 0,
             width: PhantomData,
@@ -61,20 +63,35 @@ impl<W: StableHasherResult> StableHasher<W> {
     }
 }
 
+impl<W: StableHasherResult> StableHasher<W> {
+    pub fn new() -> Self {
+        StableHasher(StableHasherWithoutDebug::new())
+    }
+
+    pub fn finish(self) -> W {
+        self.0.finish()
+    }
+
+    pub fn raw_hasher_mut(&mut self) -> &mut StableHasherWithoutDebug<W> {
+        let StableHasher(ref mut inner) = *self;
+        inner
+    }
+}
+
 impl StableHasherResult for u128 {
-    fn finish(hasher: StableHasher<Self>) -> Self {
+    fn finish(hasher: StableHasherWithoutDebug<Self>) -> Self {
         let (_0, _1) = hasher.finalize();
         (_0 as u128) | ((_1 as u128) << 64)
     }
 }
 
 impl StableHasherResult for u64 {
-    fn finish(hasher: StableHasher<Self>) -> Self {
+    fn finish(hasher: StableHasherWithoutDebug<Self>) -> Self {
         hasher.finalize().0
     }
 }
 
-impl<W> StableHasher<W> {
+impl<W> StableHasherWithoutDebug<W> {
     #[inline]
     pub fn finalize(self) -> (u64, u64) {
         self.state.finish128()
@@ -89,7 +106,7 @@ impl<W> StableHasher<W> {
 // For the non-u8 integer cases we leb128 encode them first. Because small
 // integers dominate, this significantly and cheaply reduces the number of
 // bytes hashed, which is good because blake2b is expensive.
-impl<W> Hasher for StableHasher<W> {
+impl<W> Hasher for StableHasherWithoutDebug<W> {
     fn finish(&self) -> u64 {
         panic!("use StableHasher::finalize instead");
     }
@@ -180,6 +197,7 @@ pub trait StableHashingContextProvider {
     fn create_stable_hashing_context(&self) -> Self::ContextType;
 }
 
+
 impl<'a, T: StableHashingContextProvider> StableHashingContextProvider for &'a T {
     type ContextType = T::ContextType;
 
@@ -204,6 +222,13 @@ pub trait HashStable<CTX> {
                                           hasher: &mut StableHasher<W>);
 }
 
+pub trait HashDebuggingContext {
+    fn hash_and_debug<W: StableHasherResult,
+                      T: Hash + ?Sized>(&mut self,
+                                        hs: &T,
+                                        hasher: &mut StableHasher<W>);
+}
+
 /// Implement this for types that can be turned into stable keys like, for
 /// example, for DefId that can be converted to a DefPathHash. This is used for
 /// bringing maps into a predictable order before hashing them.
@@ -216,12 +241,12 @@ pub trait ToStableHashKey<HCX> {
 // self-contained values that don't depend on the hashing context `CTX`.
 macro_rules! impl_stable_hash_via_hash {
     ($t:ty) => (
-        impl<CTX> HashStable<CTX> for $t {
+        impl<CTX: HashDebuggingContext> HashStable<CTX> for $t {
             #[inline]
             fn hash_stable<W: StableHasherResult>(&self,
-                                                  _: &mut CTX,
+                                                  hcx: &mut CTX,
                                                   hasher: &mut StableHasher<W>) {
-                ::std::hash::Hash::hash(self, hasher);
+                hcx.hash_and_debug(self, hasher);
             }
         }
     );
@@ -245,7 +270,7 @@ impl_stable_hash_via_hash!(i128);
 impl_stable_hash_via_hash!(char);
 impl_stable_hash_via_hash!(());
 
-impl<CTX> HashStable<CTX> for f32 {
+impl<CTX: HashDebuggingContext> HashStable<CTX> for f32 {
     fn hash_stable<W: StableHasherResult>(&self,
                                           ctx: &mut CTX,
                                           hasher: &mut StableHasher<W>) {
@@ -256,7 +281,7 @@ impl<CTX> HashStable<CTX> for f32 {
     }
 }
 
-impl<CTX> HashStable<CTX> for f64 {
+impl<CTX: HashDebuggingContext> HashStable<CTX> for f64 {
     fn hash_stable<W: StableHasherResult>(&self,
                                           ctx: &mut CTX,
                                           hasher: &mut StableHasher<W>) {
@@ -301,7 +326,7 @@ impl<T1, T2, T3, CTX> HashStable<CTX> for (T1, T2, T3)
     }
 }
 
-impl<T: HashStable<CTX>, CTX> HashStable<CTX> for [T] {
+impl<T: HashStable<CTX>, CTX: HashDebuggingContext> HashStable<CTX> for [T] {
     default fn hash_stable<W: StableHasherResult>(&self,
                                                   ctx: &mut CTX,
                                                   hasher: &mut StableHasher<W>) {
@@ -312,7 +337,7 @@ impl<T: HashStable<CTX>, CTX> HashStable<CTX> for [T] {
     }
 }
 
-impl<T: HashStable<CTX>, CTX> HashStable<CTX> for Vec<T> {
+impl<T: HashStable<CTX>, CTX: HashDebuggingContext> HashStable<CTX> for Vec<T> {
     #[inline]
     fn hash_stable<W: StableHasherResult>(&self,
                                           ctx: &mut CTX,
@@ -348,18 +373,18 @@ impl<T: ?Sized + HashStable<CTX>, CTX> HashStable<CTX> for ::std::sync::Arc<T> {
     }
 }
 
-impl<CTX> HashStable<CTX> for str {
+impl<CTX: HashDebuggingContext> HashStable<CTX> for str {
     #[inline]
     fn hash_stable<W: StableHasherResult>(&self,
-                                          _: &mut CTX,
+                                          ctx: &mut CTX,
                                           hasher: &mut StableHasher<W>) {
-        self.len().hash(hasher);
-        self.as_bytes().hash(hasher);
+        ctx.hash_and_debug(&self.len(), hasher);
+        ctx.hash_and_debug(self.as_bytes(), hasher);
     }
 }
 
 
-impl<CTX> HashStable<CTX> for String {
+impl<CTX: HashDebuggingContext> HashStable<CTX> for String {
     #[inline]
     fn hash_stable<W: StableHasherResult>(&self,
                                           hcx: &mut CTX,
@@ -368,7 +393,7 @@ impl<CTX> HashStable<CTX> for String {
     }
 }
 
-impl<HCX> ToStableHashKey<HCX> for String {
+impl<HCX: HashDebuggingContext> ToStableHashKey<HCX> for String {
     type KeyType = String;
     #[inline]
     fn to_stable_hash_key(&self, _: &HCX) -> Self::KeyType {
@@ -376,7 +401,7 @@ impl<HCX> ToStableHashKey<HCX> for String {
     }
 }
 
-impl<CTX> HashStable<CTX> for bool {
+impl<CTX: HashDebuggingContext> HashStable<CTX> for bool {
     #[inline]
     fn hash_stable<W: StableHasherResult>(&self,
                                           ctx: &mut CTX,
@@ -386,7 +411,7 @@ impl<CTX> HashStable<CTX> for bool {
 }
 
 
-impl<T, CTX> HashStable<CTX> for Option<T>
+impl<T, CTX: HashDebuggingContext> HashStable<CTX> for Option<T>
     where T: HashStable<CTX>
 {
     #[inline]
@@ -402,7 +427,7 @@ impl<T, CTX> HashStable<CTX> for Option<T>
     }
 }
 
-impl<T1, T2, CTX> HashStable<CTX> for Result<T1, T2>
+impl<T1, T2, CTX: HashDebuggingContext> HashStable<CTX> for Result<T1, T2>
     where T1: HashStable<CTX>,
           T2: HashStable<CTX>,
 {
@@ -429,16 +454,17 @@ impl<'a, T, CTX> HashStable<CTX> for &'a T
     }
 }
 
-impl<T, CTX> HashStable<CTX> for ::std::mem::Discriminant<T> {
+impl<T, CTX: HashDebuggingContext> HashStable<CTX> for ::std::mem::Discriminant<T> {
     #[inline]
     fn hash_stable<W: StableHasherResult>(&self,
-                                          _: &mut CTX,
+                                          hcx: &mut CTX,
                                           hasher: &mut StableHasher<W>) {
-        ::std::hash::Hash::hash(self, hasher);
+        hcx.hash_and_debug(self, hasher);
     }
 }
 
-impl<I: ::indexed_vec::Idx, T, CTX> HashStable<CTX> for ::indexed_vec::IndexVec<I, T>
+impl<I: ::indexed_vec::Idx, T,
+     CTX: HashDebuggingContext> HashStable<CTX> for ::indexed_vec::IndexVec<I, T>
     where T: HashStable<CTX>,
 {
     fn hash_stable<W: StableHasherResult>(&self,
@@ -452,7 +478,8 @@ impl<I: ::indexed_vec::Idx, T, CTX> HashStable<CTX> for ::indexed_vec::IndexVec<
 }
 
 
-impl<I: ::indexed_vec::Idx, CTX> HashStable<CTX> for ::indexed_set::IdxSetBuf<I>
+impl<I: ::indexed_vec::Idx,
+     CTX: HashDebuggingContext> HashStable<CTX> for ::indexed_set::IdxSetBuf<I>
 {
     fn hash_stable<W: StableHasherResult>(&self,
                                           ctx: &mut CTX,
@@ -468,6 +495,7 @@ impl<K, V, R, HCX> HashStable<HCX> for ::std::collections::HashMap<K, V, R>
     where K: ToStableHashKey<HCX> + Eq + Hash,
           V: HashStable<HCX>,
           R: BuildHasher,
+          HCX: HashDebuggingContext,
 {
     #[inline]
     fn hash_stable<W: StableHasherResult>(&self,
@@ -480,6 +508,7 @@ impl<K, V, R, HCX> HashStable<HCX> for ::std::collections::HashMap<K, V, R>
 impl<K, R, HCX> HashStable<HCX> for ::std::collections::HashSet<K, R>
     where K: ToStableHashKey<HCX> + Eq + Hash,
           R: BuildHasher,
+          HCX: HashDebuggingContext,
 {
     fn hash_stable<W: StableHasherResult>(&self,
                                           hcx: &mut HCX,
@@ -495,6 +524,7 @@ impl<K, R, HCX> HashStable<HCX> for ::std::collections::HashSet<K, R>
 impl<K, V, HCX> HashStable<HCX> for ::std::collections::BTreeMap<K, V>
     where K: ToStableHashKey<HCX>,
           V: HashStable<HCX>,
+          HCX: HashDebuggingContext,
 {
     fn hash_stable<W: StableHasherResult>(&self,
                                           hcx: &mut HCX,
@@ -509,6 +539,7 @@ impl<K, V, HCX> HashStable<HCX> for ::std::collections::BTreeMap<K, V>
 
 impl<K, HCX> HashStable<HCX> for ::std::collections::BTreeSet<K>
     where K: ToStableHashKey<HCX>,
+          HCX: HashDebuggingContext,
 {
     fn hash_stable<W: StableHasherResult>(&self,
                                           hcx: &mut HCX,
@@ -532,6 +563,7 @@ pub fn hash_stable_hashmap<HCX, K, V, R, SK, F, W>(
           SK: HashStable<HCX> + Ord + Clone,
           F: Fn(&K, &HCX) -> SK,
           W: StableHasherResult,
+          HCX: HashDebuggingContext,
 {
     let mut entries: Vec<_> = map.iter()
                                   .map(|(k, v)| (to_stable_hash_key(k, hcx), v))
@@ -560,7 +592,8 @@ impl<T> ::std::ops::Deref for StableVec<T> {
 }
 
 impl<T, HCX> HashStable<HCX> for StableVec<T>
-    where T: HashStable<HCX> + ToStableHashKey<HCX>
+    where T: HashStable<HCX> + ToStableHashKey<HCX>,
+          HCX: HashDebuggingContext
 {
     fn hash_stable<W: StableHasherResult>(&self,
                                           hcx: &mut HCX,

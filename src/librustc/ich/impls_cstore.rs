@@ -11,7 +11,8 @@
 //! This module contains `HashStable` implementations for various data types
 //! from rustc::middle::cstore in no particular order.
 
-use rustc_data_structures::stable_hasher::{HashStable, StableHasher, StableHasherResult};
+use rustc_data_structures::stable_hasher::{HashStable, StableHasher, StableHasherResult,
+                                           HashDebuggingContext};
 
 use middle;
 
@@ -54,7 +55,7 @@ impl_stable_hash_for!(struct middle::cstore::CrateSource {
     rmeta
 });
 
-impl<HCX> HashStable<HCX> for middle::cstore::ExternBodyNestedBodies {
+impl<HCX: HashDebuggingContext> HashStable<HCX> for middle::cstore::ExternBodyNestedBodies {
     fn hash_stable<W: StableHasherResult>(&self,
                                           hcx: &mut HCX,
                                           hasher: &mut StableHasher<W>) {
@@ -67,7 +68,7 @@ impl<HCX> HashStable<HCX> for middle::cstore::ExternBodyNestedBodies {
     }
 }
 
-impl<'a, HCX> HashStable<HCX> for middle::cstore::ExternConstBody<'a> {
+impl<'a, HCX: HashDebuggingContext> HashStable<HCX> for middle::cstore::ExternConstBody<'a> {
     fn hash_stable<W: StableHasherResult>(&self,
                                           hcx: &mut HCX,
                                           hasher: &mut StableHasher<W>) {

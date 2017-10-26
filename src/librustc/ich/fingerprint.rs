@@ -52,17 +52,17 @@ impl ::std::fmt::Display for Fingerprint {
 }
 
 impl stable_hasher::StableHasherResult for Fingerprint {
-    fn finish(hasher: stable_hasher::StableHasher<Self>) -> Self {
+    fn finish(hasher: stable_hasher::StableHasherWithoutDebug<Self>) -> Self {
         let (_0, _1) = hasher.finalize();
         Fingerprint(_0, _1)
     }
 }
 
-impl<CTX> stable_hasher::HashStable<CTX> for Fingerprint {
+impl<CTX: stable_hasher::HashDebuggingContext> stable_hasher::HashStable<CTX> for Fingerprint {
     #[inline]
     fn hash_stable<W: stable_hasher::StableHasherResult>(&self,
-                                          _: &mut CTX,
+                                          hcx: &mut CTX,
                                           hasher: &mut stable_hasher::StableHasher<W>) {
-        ::std::hash::Hash::hash(self, hasher);
+        hcx.hash_and_debug(self, hasher);
     }
 }

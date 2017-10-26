@@ -13,7 +13,6 @@
 
 use ich::StableHashingContext;
 
-use std::hash as std_hash;
 use std::mem;
 
 use syntax::ast;
@@ -25,7 +24,8 @@ use syntax_pos::FileMap;
 use hir::def_id::{DefId, CrateNum, CRATE_DEF_INDEX};
 
 use rustc_data_structures::stable_hasher::{HashStable, ToStableHashKey,
-                                           StableHasher, StableHasherResult};
+                                           StableHasher, StableHasherResult,
+                                           HashDebuggingContext};
 use rustc_data_structures::accumulate_vec::AccumulateVec;
 
 impl<'gcx> HashStable<StableHashingContext<'gcx>> for InternedString {
@@ -232,7 +232,7 @@ for tokenstream::TokenTree {
             }
             tokenstream::TokenTree::Delimited(span, ref delimited) => {
                 span.hash_stable(hcx, hasher);
-                std_hash::Hash::hash(&delimited.delim, hasher);
+                hcx.hash_and_debug(&delimited.delim, hasher);
                 for sub_tt in delimited.stream().trees() {
                     sub_tt.hash_stable(hcx, hasher);
                 }
@@ -291,12 +291,12 @@ fn hash_token<'gcx, W: StableHasherResult>(token: &token::Token,
 
         token::Token::BinOp(bin_op_token) |
         token::Token::BinOpEq(bin_op_token) => {
-            std_hash::Hash::hash(&bin_op_token, hasher);
+            hcx.hash_and_debug(&bin_op_token, hasher);
         }
 
         token::Token::OpenDelim(delim_token) |
         token::Token::CloseDelim(delim_token) => {
-            std_hash::Hash::hash(&delim_token, hasher);
+            hcx.hash_and_debug(&delim_token, hasher);
         }
         token::Token::Literal(ref lit, ref opt_name) => {
             mem::discriminant(lit).hash_stable(hcx, hasher);

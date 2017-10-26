@@ -25,6 +25,7 @@ use middle::lang_items;
 
 use rustc_const_math::{ConstInt, ConstIsize, ConstUsize};
 use rustc_data_structures::stable_hasher::{StableHasher, StableHasherResult,
+                                           StableHasherWithoutDebug,
                                            HashStable};
 use rustc_data_structures::fx::FxHashMap;
 use std::cmp;
@@ -651,14 +652,14 @@ impl<'a, 'gcx, 'tcx> TyCtxt<'a, 'gcx, 'tcx> {
 
 pub struct TypeIdHasher<'a, 'gcx: 'a+'tcx, 'tcx: 'a, W> {
     tcx: TyCtxt<'a, 'gcx, 'tcx>,
-    state: StableHasher<W>,
+    state: StableHasherWithoutDebug<W>,
 }
 
 impl<'a, 'gcx, 'tcx, W> TypeIdHasher<'a, 'gcx, 'tcx, W>
     where W: StableHasherResult
 {
     pub fn new(tcx: TyCtxt<'a, 'gcx, 'tcx>) -> Self {
-        TypeIdHasher { tcx: tcx, state: StableHasher::new() }
+        TypeIdHasher { tcx: tcx, state: StableHasherWithoutDebug::new() }
     }
 
     pub fn finish(self) -> W {

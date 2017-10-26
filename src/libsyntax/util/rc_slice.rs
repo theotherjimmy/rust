@@ -13,7 +13,7 @@ use std::ops::{Deref, Range};
 use std::rc::Rc;
 
 use rustc_data_structures::stable_hasher::{StableHasher, StableHasherResult,
-                                           HashStable};
+                                           HashStable, HashDebuggingContext};
 
 #[derive(Clone)]
 pub struct RcSlice<T> {
@@ -54,7 +54,8 @@ impl<T: fmt::Debug> fmt::Debug for RcSlice<T> {
 }
 
 impl<CTX, T> HashStable<CTX> for RcSlice<T>
-    where T: HashStable<CTX>
+    where T: HashStable<CTX>,
+          CTX: HashDebuggingContext
 {
     fn hash_stable<W: StableHasherResult>(&self,
                                           hcx: &mut CTX,

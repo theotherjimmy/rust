@@ -22,6 +22,7 @@ use std::cmp::Ord;
 use std::hash as std_hash;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::hash::Hash;
 
 use syntax::ast;
 use syntax::attr;
@@ -32,7 +33,7 @@ use syntax_pos::Span;
 
 use rustc_data_structures::stable_hasher::{HashStable, StableHashingContextProvider,
                                            StableHasher, StableHasherResult,
-                                           ToStableHashKey};
+                                           ToStableHashKey, HashDebuggingContext};
 use rustc_data_structures::accumulate_vec::AccumulateVec;
 use rustc_data_structures::fx::FxHashSet;
 
@@ -77,6 +78,12 @@ impl<'gcx> BodyResolver<'gcx> {
     // DOES NOT DO ANY TRACKING, use carefully.
     fn body(self, id: hir::BodyId) -> &'gcx hir::Body {
         self.0.body(id)
+    }
+}
+
+impl<'gcx> HashDebuggingContext for StableHashingContext<'gcx>{
+    fn hash_and_debug<W: StableHasherResult, T: Hash + ?Sized>(&mut self, to_hash: &T, hasher: &mut StableHasher<W>) {
+        Hash::hash(to_hash, hasher.raw_hasher_mut());
     }
 }
 
@@ -391,25 +398,25 @@ impl<'gcx> HashStable<StableHashingContext<'gcx>> for Span {
                            .unwrap_or(("???", 0, 0));
 
             if loc1.0 == loc2.0 {
-                std_hash::Hash::hash(&0u8, hasher);
+                hcx.hash_and_debug(&0u8, hasher);
 
-                std_hash::Hash::hash(loc1.0, hasher);
-                std_hash::Hash::hash(&loc1.1, hasher);
-                std_hash::Hash::hash(&loc1.2, hasher);
+                hcx.hash_and_debug(loc1.0, hasher);
+                hcx.hash_and_debug(&loc1.1, hasher);
+                hcx.hash_and_debug(&loc1.2, hasher);
 
                 // Do not hash the file name twice
-                std_hash::Hash::hash(&loc2.1, hasher);
-                std_hash::Hash::hash(&loc2.2, hasher);
+                hcx.hash_and_debug(&loc2.1, hasher);
+                hcx.hash_and_debug(&loc2.2, hasher);
             } else {
-                std_hash::Hash::hash(&1u8, hasher);
+                hcx.hash_and_debug(&1u8, hasher);
 
-                std_hash::Hash::hash(loc1.0, hasher);
-                std_hash::Hash::hash(&loc1.1, hasher);
-                std_hash::Hash::hash(&loc1.2, hasher);
+                hcx.hash_and_debug(loc1.0, hasher);
+                hcx.hash_and_debug(&loc1.1, hasher);
+                hcx.hash_and_debug(&loc1.2, hasher);
 
-                std_hash::Hash::hash(loc2.0, hasher);
-                std_hash::Hash::hash(&loc2.1, hasher);
-                std_hash::Hash::hash(&loc2.2, hasher);
+                hcx.hash_and_debug(loc2.0, hasher);
+                hcx.hash_and_debug(&loc2.1, hasher);
+                hcx.hash_and_debug(&loc2.2, hasher);
             }
         }
 

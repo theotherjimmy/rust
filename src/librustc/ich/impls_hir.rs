@@ -16,7 +16,8 @@ use hir::map::DefPathHash;
 use hir::def_id::{DefId, CrateNum, CRATE_DEF_INDEX};
 use ich::{StableHashingContext, NodeIdHashingMode};
 use rustc_data_structures::stable_hasher::{HashStable, ToStableHashKey,
-                                           StableHasher, StableHasherResult};
+                                           StableHasher, StableHasherResult,
+                                           HashDebuggingContext};
 use std::mem;
 use syntax::ast;
 
@@ -1144,9 +1145,9 @@ impl_stable_hash_for!(struct hir::def::Export {
 impl<'gcx> HashStable<StableHashingContext<'gcx>>
 for ::middle::lang_items::LangItem {
     fn hash_stable<W: StableHasherResult>(&self,
-                                          _: &mut StableHashingContext<'gcx>,
+                                          hcx: &mut StableHashingContext<'gcx>,
                                           hasher: &mut StableHasher<W>) {
-        ::std::hash::Hash::hash(self, hasher);
+        hcx.hash_and_debug(self, hasher);
     }
 }
 

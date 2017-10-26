@@ -12,7 +12,7 @@ use rustc::dep_graph::DepGraph;
 use rustc::hir::{self, map as hir_map};
 use rustc::hir::lowering::lower_crate;
 use rustc::ich::Fingerprint;
-use rustc_data_structures::stable_hasher::StableHasher;
+use rustc_data_structures::stable_hasher::StableHasherWithoutDebug;
 use rustc_mir as mir;
 use rustc::session::{Session, CompileResult};
 use rustc::session::CompileIncomplete;
@@ -1322,7 +1322,7 @@ pub fn compute_crate_disambiguator(session: &Session) -> String {
     // FIXME(mw): It seems that the crate_disambiguator is used everywhere as
     //            a hex-string instead of raw bytes. We should really use the
     //            smaller representation.
-    let mut hasher = StableHasher::<Fingerprint>::new();
+    let mut hasher = StableHasherWithoutDebug::<Fingerprint>::new();
 
     let mut metadata = session.opts.cg.metadata.clone();
     // We don't want the crate_disambiguator to dependent on the order
