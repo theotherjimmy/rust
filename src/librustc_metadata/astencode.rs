@@ -17,7 +17,7 @@ use rustc::hir;
 use rustc::ty::{self, TyCtxt};
 
 use rustc::ich::Fingerprint;
-use rustc_data_structures::stable_hasher::{HashStable, StableHasher};
+use rustc_data_structures::stable_hasher::{HashStable, StableHasher, NoDebugHasher};
 
 #[derive(RustcEncodable, RustcDecodable)]
 pub struct Ast<'tcx> {
@@ -36,7 +36,7 @@ impl_stable_hash_for!(struct Ast<'tcx> {
     stable_bodies_hash
 });
 
-impl<'a, 'b, 'tcx> IsolatedEncoder<'a, 'b, 'tcx> {
+impl<'a, 'b, 'tcx> IsolatedEncoder<'a, 'b, 'tcx, NoDebugHasher> {
     pub fn encode_body(&mut self, body_id: hir::BodyId) -> Lazy<Ast<'tcx>> {
         let body = self.tcx.hir.body(body_id);
 
@@ -44,7 +44,7 @@ impl<'a, 'b, 'tcx> IsolatedEncoder<'a, 'b, 'tcx> {
         // hash them here, during export, and store the hash with metadata.
         let stable_bodies_hash = {
             let mut hcx = self.tcx.create_stable_hashing_context();
-            let mut hasher = StableHasher::new();
+            let mut hasher = NoDebugHasher::new();
 
             hcx.while_hashing_hir_bodies(true, |hcx| {
                 hcx.while_hashing_spans(false, |hcx| {

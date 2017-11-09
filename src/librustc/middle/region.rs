@@ -33,8 +33,7 @@ use hir::intravisit::{self, Visitor, NestedVisitorMap};
 use hir::{Block, Arm, Pat, PatKind, Stmt, Expr, Local};
 use mir::transform::MirSource;
 use rustc_data_structures::indexed_vec::Idx;
-use rustc_data_structures::stable_hasher::{HashStable, StableHasher,
-                                           StableHasherResult};
+use rustc_data_structures::stable_hasher::{HashStable, StableHasher};
 
 /// Scope represents a statically-describable scope that can be
 /// used to bound the lifetime/region for values.
@@ -1404,9 +1403,7 @@ pub fn provide(providers: &mut Providers) {
 }
 
 impl<'gcx> HashStable<StableHashingContext<'gcx>> for ScopeTree {
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          hcx: &mut StableHashingContext<'gcx>,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, hcx: &mut StableHashingContext<'gcx>, hasher: &mut H) {
         let ScopeTree {
             root_body,
             root_parent,

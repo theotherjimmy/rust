@@ -16,8 +16,7 @@ use ich::StableHashingContext;
 use lint::builtin;
 use lint::context::CheckLintNameResult;
 use lint::{self, Lint, LintId, Level, LintSource};
-use rustc_data_structures::stable_hasher::{HashStable, ToStableHashKey,
-                                           StableHasher, StableHasherResult};
+use rustc_data_structures::stable_hasher::{HashStable, ToStableHashKey, StableHasher};
 use session::Session;
 use syntax::ast;
 use syntax::attr;
@@ -393,9 +392,7 @@ impl LintLevelMap {
 
 impl<'gcx> HashStable<StableHashingContext<'gcx>> for LintLevelMap {
     #[inline]
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          hcx: &mut StableHashingContext<'gcx>,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, hcx: &mut StableHashingContext<'gcx>, hasher: &mut H) {
         let LintLevelMap {
             ref sets,
             ref id_to_set,
@@ -434,9 +431,7 @@ impl<'gcx> HashStable<StableHashingContext<'gcx>> for LintLevelMap {
 
 impl<HCX> HashStable<HCX> for LintId {
     #[inline]
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          hcx: &mut HCX,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, hcx: &mut HCX, hasher: &mut H) {
         self.lint_name_raw().hash_stable(hcx, hasher);
     }
 }

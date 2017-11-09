@@ -9,7 +9,6 @@
 // except according to those terms.
 
 use std::hash::{Hash, Hasher, BuildHasher};
-use std::marker::PhantomData;
 use std::mem;
 use sip128::SipHasher128;
 
@@ -20,62 +19,155 @@ use sip128::SipHasher128;
 /// To that end we always convert integers to little-endian format before
 /// hashing and the architecture dependent `isize` and `usize` types are
 /// extended to 64 bits if needed.
-pub struct StableHasher<W> {
+pub struct NoDebugHasher {
     state: SipHasher128,
     bytes_hashed: u64,
-    width: PhantomData<W>,
 }
 
-impl<W: StableHasherResult> ::std::fmt::Debug for StableHasher<W> {
+
+impl ::std::fmt::Debug for NoDebugHasher {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         write!(f, "{:?}", self.state)
     }
 }
 
-pub trait StableHasherResult: Sized {
-    fn finish(hasher: StableHasher<Self>) -> Self;
+pub struct DebugHasher {
+    hasher: NoDebugHasher,
+    field_stack: Vec<&'static str>,
 }
 
-impl<W: StableHasherResult> StableHasher<W> {
-    pub fn new() -> Self {
-        StableHasher {
+impl ::std::fmt::Debug for DebugHasher {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        write!(f, "{:?}", self.hasher)
+    }
+}
+
+#[derive(Eq, PartialEq, Ord, PartialOrd, Hash, Debug, Clone, Copy, RustcEncodable, RustcDecodable)]
+pub struct Fingerprint(u64, u64);
+
+impl Fingerprint {
+    #[inline]
+    pub fn zero() -> Fingerprint {
+        Fingerprint(0, 0)
+    }
+
+    #[inline]
+    pub fn from_smaller_hash(hash: u64) -> Fingerprint {
+        Fingerprint(hash, hash)
+    }
+
+    #[inline]
+    pub fn to_smaller_hash(&self) -> u64 {
+        self.0
+    }
+
+    #[inline]
+    pub fn combine(self, other: Fingerprint) -> Fingerprint {
+        // See https://stackoverflow.com/a/27952689 on why this function is
+        // implemented this way.
+        Fingerprint(
+            self.0.wrapping_mul(3).wrapping_add(other.0),
+            self.1.wrapping_mul(3).wrapping_add(other.1)
+        )
+    }
+
+    pub fn to_hex(&self) -> String {
+        format!("{:x}{:x}", self.0, self.1)
+    }
+
+    fn finish<H: StableHasher>(hasher: H) -> Self {
+        let (_0, _1) = hasher.finalize();
+        Fingerprint(_0, _1)
+    }
+
+    pub fn to_u128(self) -> u128 {
+        ((self.0 as u128) << 64 ) + (self.1 as u128)
+    }
+}
+
+impl ::std::fmt::Display for Fingerprint {
+    fn fmt(&self, formatter: &mut ::std::fmt::Formatter) -> Result<(), ::std::fmt::Error> {
+        write!(formatter, "{:x}-{:x}", self.0, self.1)
+    }
+}
+
+
+pub trait StableHasher: Hasher + Sized + ::std::fmt::Debug {
+    fn new() -> Self;
+    fn finish(self) -> Fingerprint;
+    fn finalize(self) -> (u64, u64);
+    fn bytes_hashed(&self) -> u64;
+    fn start_field(&mut self, field: &'static str);
+    fn stop_field(&mut self, field: &'static str);
+}
+
+
+impl StableHasher for NoDebugHasher {
+    fn new() -> Self {
+        NoDebugHasher {
             state: SipHasher128::new_with_keys(0, 0),
             bytes_hashed: 0,
-            width: PhantomData,
         }
     }
 
-    pub fn finish(self) -> W {
-        W::finish(self)
+    fn finish(self) -> Fingerprint {
+        Fingerprint::finish(self)
     }
-}
 
-impl StableHasherResult for u128 {
-    fn finish(hasher: StableHasher<Self>) -> Self {
-        let (_0, _1) = hasher.finalize();
-        (_0 as u128) | ((_1 as u128) << 64)
-    }
-}
-
-impl StableHasherResult for u64 {
-    fn finish(hasher: StableHasher<Self>) -> Self {
-        hasher.finalize().0
-    }
-}
-
-impl<W> StableHasher<W> {
     #[inline]
-    pub fn finalize(self) -> (u64, u64) {
+    fn finalize(self) -> (u64, u64) {
         self.state.finish128()
     }
 
     #[inline]
-    pub fn bytes_hashed(&self) -> u64 {
+    fn bytes_hashed(&self) -> u64 {
         self.bytes_hashed
+    }
+
+    #[inline]
+    fn start_field(&mut self, _: &'static str) {
+        //The no debug hasher does not keep track of where we are in the hashing stack
+    }
+
+    fn stop_field(&mut self, _: &'static str) {
+        //The no debug hasher does not keep track of where we are in the hashing stack
     }
 }
 
-impl<W> Hasher for StableHasher<W> {
+impl StableHasher for DebugHasher {
+    fn new() -> Self {
+        DebugHasher {
+            hasher: NoDebugHasher::new(),
+            field_stack: Vec::new(),
+        }
+    }
+
+    fn finish(self) -> Fingerprint {
+        self.hasher.finish()
+    }
+
+    #[inline]
+    fn finalize(self) -> (u64, u64) {
+        self.hasher.finalize()
+    }
+
+    #[inline]
+    fn bytes_hashed(&self) -> u64 {
+        self.hasher.bytes_hashed()
+    }
+
+    #[inline]
+    fn start_field(&mut self, field: &'static str) {
+        self.field_stack.push(field);
+    }
+
+    fn stop_field(&mut self, field: &'static str) {
+        let old = self.field_stack.pop();
+        assert!(old == Some(field));
+    }
+}
+
+impl Hasher for NoDebugHasher {
     fn finish(&self) -> u64 {
         panic!("use StableHasher::finalize instead");
     }
@@ -165,6 +257,77 @@ impl<W> Hasher for StableHasher<W> {
     }
 }
 
+impl Hasher for DebugHasher {
+    fn finish(&self) -> u64 {
+        panic!("use StableHasher::finalize instead");
+    }
+
+    #[inline]
+    fn write(&mut self, bytes: &[u8]) {
+        self.hasher.write(bytes)
+    }
+
+    #[inline]
+    fn write_u8(&mut self, i: u8) {
+        self.hasher.write_u8(i)
+    }
+
+    #[inline]
+    fn write_u16(&mut self, i: u16) {
+        self.hasher.write_u16(i)
+    }
+
+    #[inline]
+    fn write_u32(&mut self, i: u32) {
+        self.hasher.write_u32(i)
+    }
+
+    #[inline]
+    fn write_u64(&mut self, i: u64) {
+        self.hasher.write_u64(i)
+    }
+
+    #[inline]
+    fn write_u128(&mut self, i: u128) {
+        self.hasher.write_u128(i)
+    }
+
+    #[inline]
+    fn write_usize(&mut self, i: usize) {
+        self.hasher.write_usize(i)
+    }
+
+    #[inline]
+    fn write_i8(&mut self, i: i8) {
+        self.hasher.write_i8(i)
+    }
+
+    #[inline]
+    fn write_i16(&mut self, i: i16) {
+        self.hasher.write_i16(i)
+    }
+
+    #[inline]
+    fn write_i32(&mut self, i: i32) {
+        self.hasher.write_i32(i)
+    }
+
+    #[inline]
+    fn write_i64(&mut self, i: i64) {
+        self.hasher.write_i64(i)
+    }
+
+    #[inline]
+    fn write_i128(&mut self, i: i128) {
+        self.hasher.write_i128(i)
+    }
+
+    #[inline]
+    fn write_isize(&mut self, i: isize) {
+        self.hasher.write_isize(i)
+    }
+}
+
 
 /// Something that can provide a stable hashing context.
 pub trait StableHashingContextProvider {
@@ -191,9 +354,7 @@ impl<'a, T: StableHashingContextProvider> StableHashingContextProvider for &'a m
 /// Something that implements `HashStable<CTX>` can be hashed in a way that is
 /// stable across multiple compilation sessions.
 pub trait HashStable<CTX> {
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          hcx: &mut CTX,
-                                          hasher: &mut StableHasher<W>);
+    fn hash_stable<H: StableHasher>(&self, hcx: &mut CTX, hasher: &mut H);
 }
 
 /// Implement this for types that can be turned into stable keys like, for
@@ -210,9 +371,7 @@ macro_rules! impl_stable_hash_via_hash {
     ($t:ty) => (
         impl<CTX> HashStable<CTX> for $t {
             #[inline]
-            fn hash_stable<W: StableHasherResult>(&self,
-                                                  _: &mut CTX,
-                                                  hasher: &mut StableHasher<W>) {
+            fn hash_stable<H: StableHasher>(&self, _: &mut CTX, hasher: &mut H) {
                 ::std::hash::Hash::hash(self, hasher);
             }
         }
@@ -238,9 +397,7 @@ impl_stable_hash_via_hash!(char);
 impl_stable_hash_via_hash!(());
 
 impl<CTX> HashStable<CTX> for f32 {
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          ctx: &mut CTX,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, ctx: &mut CTX, hasher: &mut H) {
         let val: u32 = unsafe {
             ::std::mem::transmute(*self)
         };
@@ -249,9 +406,7 @@ impl<CTX> HashStable<CTX> for f32 {
 }
 
 impl<CTX> HashStable<CTX> for f64 {
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          ctx: &mut CTX,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, ctx: &mut CTX, hasher: &mut H) {
         let val: u64 = unsafe {
             ::std::mem::transmute(*self)
         };
@@ -260,18 +415,14 @@ impl<CTX> HashStable<CTX> for f64 {
 }
 
 impl<T1: HashStable<CTX>, CTX> HashStable<CTX> for (T1,) {
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          ctx: &mut CTX,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, ctx: &mut CTX, hasher: &mut H) {
         let (ref _0,) = *self;
         _0.hash_stable(ctx, hasher);
     }
 }
 
 impl<T1: HashStable<CTX>, T2: HashStable<CTX>, CTX> HashStable<CTX> for (T1, T2) {
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          ctx: &mut CTX,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, ctx: &mut CTX, hasher: &mut H) {
         let (ref _0, ref _1) = *self;
         _0.hash_stable(ctx, hasher);
         _1.hash_stable(ctx, hasher);
@@ -283,9 +434,7 @@ impl<T1, T2, T3, CTX> HashStable<CTX> for (T1, T2, T3)
            T2: HashStable<CTX>,
            T3: HashStable<CTX>,
 {
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          ctx: &mut CTX,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, ctx: &mut CTX, hasher: &mut H) {
         let (ref _0, ref _1, ref _2) = *self;
         _0.hash_stable(ctx, hasher);
         _1.hash_stable(ctx, hasher);
@@ -294,9 +443,7 @@ impl<T1, T2, T3, CTX> HashStable<CTX> for (T1, T2, T3)
 }
 
 impl<T: HashStable<CTX>, CTX> HashStable<CTX> for [T] {
-    default fn hash_stable<W: StableHasherResult>(&self,
-                                                  ctx: &mut CTX,
-                                                  hasher: &mut StableHasher<W>) {
+    default fn hash_stable<H: StableHasher>(&self, ctx: &mut CTX, hasher: &mut H) {
         self.len().hash_stable(ctx, hasher);
         for item in self {
             item.hash_stable(ctx, hasher);
@@ -306,56 +453,43 @@ impl<T: HashStable<CTX>, CTX> HashStable<CTX> for [T] {
 
 impl<T: HashStable<CTX>, CTX> HashStable<CTX> for Vec<T> {
     #[inline]
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          ctx: &mut CTX,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, ctx: &mut CTX, hasher: &mut H) {
         (&self[..]).hash_stable(ctx, hasher);
     }
 }
 
 impl<T: ?Sized + HashStable<CTX>, CTX> HashStable<CTX> for Box<T> {
     #[inline]
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          ctx: &mut CTX,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, ctx: &mut CTX, hasher: &mut H) {
         (**self).hash_stable(ctx, hasher);
     }
 }
 
 impl<T: ?Sized + HashStable<CTX>, CTX> HashStable<CTX> for ::std::rc::Rc<T> {
     #[inline]
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          ctx: &mut CTX,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, ctx: &mut CTX, hasher: &mut H) {
         (**self).hash_stable(ctx, hasher);
     }
 }
 
 impl<T: ?Sized + HashStable<CTX>, CTX> HashStable<CTX> for ::std::sync::Arc<T> {
     #[inline]
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          ctx: &mut CTX,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, ctx: &mut CTX, hasher: &mut H) {
         (**self).hash_stable(ctx, hasher);
     }
 }
 
 impl<CTX> HashStable<CTX> for str {
     #[inline]
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          _: &mut CTX,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, _: &mut CTX, hasher: &mut H) {
         self.len().hash(hasher);
         self.as_bytes().hash(hasher);
     }
 }
 
-
 impl<CTX> HashStable<CTX> for String {
     #[inline]
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          hcx: &mut CTX,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, hcx: &mut CTX, hasher: &mut H) {
         (&self[..]).hash_stable(hcx, hasher);
     }
 }
@@ -370,9 +504,7 @@ impl<HCX> ToStableHashKey<HCX> for String {
 
 impl<CTX> HashStable<CTX> for bool {
     #[inline]
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          ctx: &mut CTX,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, ctx: &mut CTX, hasher: &mut H) {
         (if *self { 1u8 } else { 0u8 }).hash_stable(ctx, hasher);
     }
 }
@@ -382,9 +514,7 @@ impl<T, CTX> HashStable<CTX> for Option<T>
     where T: HashStable<CTX>
 {
     #[inline]
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          ctx: &mut CTX,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, ctx: &mut CTX, hasher: &mut H) {
         if let Some(ref value) = *self {
             1u8.hash_stable(ctx, hasher);
             value.hash_stable(ctx, hasher);
@@ -399,9 +529,7 @@ impl<T1, T2, CTX> HashStable<CTX> for Result<T1, T2>
           T2: HashStable<CTX>,
 {
     #[inline]
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          ctx: &mut CTX,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, ctx: &mut CTX, hasher: &mut H) {
         mem::discriminant(self).hash_stable(ctx, hasher);
         match *self {
             Ok(ref x) => x.hash_stable(ctx, hasher),
@@ -414,18 +542,14 @@ impl<'a, T, CTX> HashStable<CTX> for &'a T
     where T: HashStable<CTX> + ?Sized
 {
     #[inline]
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          ctx: &mut CTX,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, ctx: &mut CTX, hasher: &mut H) {
         (**self).hash_stable(ctx, hasher);
     }
 }
 
 impl<T, CTX> HashStable<CTX> for ::std::mem::Discriminant<T> {
     #[inline]
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          _: &mut CTX,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, _: &mut CTX, hasher: &mut H) {
         ::std::hash::Hash::hash(self, hasher);
     }
 }
@@ -433,9 +557,7 @@ impl<T, CTX> HashStable<CTX> for ::std::mem::Discriminant<T> {
 impl<I: ::indexed_vec::Idx, T, CTX> HashStable<CTX> for ::indexed_vec::IndexVec<I, T>
     where T: HashStable<CTX>,
 {
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          ctx: &mut CTX,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, ctx: &mut CTX, hasher: &mut H) {
         self.len().hash_stable(ctx, hasher);
         for v in &self.raw {
             v.hash_stable(ctx, hasher);
@@ -446,9 +568,7 @@ impl<I: ::indexed_vec::Idx, T, CTX> HashStable<CTX> for ::indexed_vec::IndexVec<
 
 impl<I: ::indexed_vec::Idx, CTX> HashStable<CTX> for ::indexed_set::IdxSetBuf<I>
 {
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          ctx: &mut CTX,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, ctx: &mut CTX, hasher: &mut H) {
         self.words().hash_stable(ctx, hasher);
     }
 }
@@ -462,9 +582,7 @@ impl<K, V, R, HCX> HashStable<HCX> for ::std::collections::HashMap<K, V, R>
           R: BuildHasher,
 {
     #[inline]
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          hcx: &mut HCX,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, hcx: &mut HCX, hasher: &mut H) {
         hash_stable_hashmap(hcx, hasher, self, ToStableHashKey::to_stable_hash_key);
     }
 }
@@ -473,9 +591,7 @@ impl<K, R, HCX> HashStable<HCX> for ::std::collections::HashSet<K, R>
     where K: ToStableHashKey<HCX> + Eq + Hash,
           R: BuildHasher,
 {
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          hcx: &mut HCX,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, hcx: &mut HCX, hasher: &mut H) {
         let mut keys: Vec<_> = self.iter()
                                    .map(|k| k.to_stable_hash_key(hcx))
                                    .collect();
@@ -488,9 +604,7 @@ impl<K, V, HCX> HashStable<HCX> for ::std::collections::BTreeMap<K, V>
     where K: ToStableHashKey<HCX>,
           V: HashStable<HCX>,
 {
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          hcx: &mut HCX,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, hcx: &mut HCX, hasher: &mut H) {
         let mut entries: Vec<_> = self.iter()
                                       .map(|(k, v)| (k.to_stable_hash_key(hcx), v))
                                       .collect();
@@ -502,9 +616,7 @@ impl<K, V, HCX> HashStable<HCX> for ::std::collections::BTreeMap<K, V>
 impl<K, HCX> HashStable<HCX> for ::std::collections::BTreeSet<K>
     where K: ToStableHashKey<HCX>,
 {
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          hcx: &mut HCX,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, hcx: &mut HCX, hasher: &mut H) {
         let mut keys: Vec<_> = self.iter()
                                    .map(|k| k.to_stable_hash_key(hcx))
                                    .collect();
@@ -513,9 +625,9 @@ impl<K, HCX> HashStable<HCX> for ::std::collections::BTreeSet<K>
     }
 }
 
-pub fn hash_stable_hashmap<HCX, K, V, R, SK, F, W>(
+pub fn hash_stable_hashmap<HCX, K, V, R, SK, F, H>(
     hcx: &mut HCX,
-    hasher: &mut StableHasher<W>,
+    hasher: &mut H,
     map: &::std::collections::HashMap<K, V, R>,
     to_stable_hash_key: F)
     where K: Eq + Hash,
@@ -523,7 +635,7 @@ pub fn hash_stable_hashmap<HCX, K, V, R, SK, F, W>(
           R: BuildHasher,
           SK: HashStable<HCX> + Ord + Clone,
           F: Fn(&K, &HCX) -> SK,
-          W: StableHasherResult,
+          H: StableHasher
 {
     let mut entries: Vec<_> = map.iter()
                                   .map(|(k, v)| (to_stable_hash_key(k, hcx), v))
@@ -532,6 +644,12 @@ pub fn hash_stable_hashmap<HCX, K, V, R, SK, F, W>(
     entries.hash_stable(hcx, hasher);
 }
 
+impl<CTX> HashStable<CTX> for Fingerprint {
+    #[inline]
+    fn hash_stable<H: StableHasher>(&self, _: &mut CTX, hasher: &mut H) {
+        ::std::hash::Hash::hash(self, hasher);
+    }
+}
 
 /// A vector container that makes sure that its items are hashed in a stable
 /// order.
@@ -554,9 +672,7 @@ impl<T> ::std::ops::Deref for StableVec<T> {
 impl<T, HCX> HashStable<HCX> for StableVec<T>
     where T: HashStable<HCX> + ToStableHashKey<HCX>
 {
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          hcx: &mut HCX,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, hcx: &mut HCX, hasher: &mut H) {
         let StableVec(ref v) = *self;
 
         let mut sorted: Vec<_> = v.iter()

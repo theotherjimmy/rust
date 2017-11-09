@@ -169,7 +169,7 @@ fn get_symbol_hash<'a, 'tcx>(tcx: TyCtxt<'a, 'tcx, 'tcx>,
                              -> u64 {
     debug!("get_symbol_hash(def_id={:?}, parameters={:?})", def_id, substs);
 
-    let mut hasher = ty::util::TypeIdHasher::<u64>::new(tcx);
+    let mut hasher = ty::util::TypeIdHasher::new(tcx);
 
     record_time(&tcx.sess.perf_stats.symbol_hash_time, || {
         // the main symbol name is not necessarily unique; hash in the
@@ -225,7 +225,7 @@ fn get_symbol_hash<'a, 'tcx>(tcx: TyCtxt<'a, 'tcx, 'tcx>,
     });
 
     // 64 bits should be enough to avoid collisions.
-    hasher.finish()
+    hasher.finish().to_smaller_hash()
 }
 
 fn def_symbol_name<'a, 'tcx>(tcx: TyCtxt<'a, 'tcx, 'tcx>, def_id: DefId)

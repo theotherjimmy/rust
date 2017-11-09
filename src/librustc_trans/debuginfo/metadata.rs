@@ -30,7 +30,6 @@ use rustc::ty::fold::TypeVisitor;
 use rustc::ty::subst::Substs;
 use rustc::ty::util::TypeIdHasher;
 use rustc::hir;
-use rustc::ich::Fingerprint;
 use {type_of, machine, monomorphize};
 use common::{self, CrateContext};
 use type_::Type;
@@ -146,7 +145,7 @@ impl<'tcx> TypeMap<'tcx> {
 
         // The hasher we are using to generate the UniqueTypeId. We want
         // something that provides more than the 64 bits of the DefaultHasher.
-        let mut type_id_hasher = TypeIdHasher::<Fingerprint>::new(cx.tcx());
+        let mut type_id_hasher = TypeIdHasher::new(cx.tcx());
         type_id_hasher.visit_ty(type_);
         let unique_type_id = type_id_hasher.finish().to_hex();
 

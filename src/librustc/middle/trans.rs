@@ -12,8 +12,7 @@ use syntax::ast::NodeId;
 use syntax::symbol::InternedString;
 use ty::Instance;
 use util::nodemap::FxHashMap;
-use rustc_data_structures::stable_hasher::{HashStable, StableHasherResult,
-                                           StableHasher};
+use rustc_data_structures::stable_hasher::{HashStable, StableHasher, NoDebugHasher};
 use ich::{Fingerprint, StableHashingContext, NodeIdHashingMode};
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug, Hash)]
@@ -24,9 +23,7 @@ pub enum TransItem<'tcx> {
 }
 
 impl<'tcx> HashStable<StableHashingContext<'tcx>> for TransItem<'tcx> {
-    fn hash_stable<W: StableHasherResult>(&self,
-                                           hcx: &mut StableHashingContext<'tcx>,
-                                           hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, hcx: &mut StableHashingContext<'tcx>, hasher: &mut H) {
         ::std::mem::discriminant(self).hash_stable(hcx, hasher);
 
         match *self {
@@ -122,9 +119,7 @@ impl<'tcx> CodegenUnit<'tcx> {
 }
 
 impl<'tcx> HashStable<StableHashingContext<'tcx>> for CodegenUnit<'tcx> {
-    fn hash_stable<W: StableHasherResult>(&self,
-                                           hcx: &mut StableHashingContext<'tcx>,
-                                           hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, hcx: &mut StableHashingContext<'tcx>, hasher: &mut H) {
         let CodegenUnit {
             ref items,
             name,
@@ -133,7 +128,7 @@ impl<'tcx> HashStable<StableHashingContext<'tcx>> for CodegenUnit<'tcx> {
         name.hash_stable(hcx, hasher);
 
         let mut items: Vec<(Fingerprint, _)> = items.iter().map(|(trans_item, &attrs)| {
-            let mut hasher = StableHasher::new();
+            let mut hasher = NoDebugHasher::new();
             trans_item.hash_stable(hcx, &mut hasher);
             let trans_item_fingerprint = hasher.finish();
             (trans_item_fingerprint, attrs)

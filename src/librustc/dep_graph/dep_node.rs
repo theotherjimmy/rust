@@ -67,7 +67,7 @@ use hir::{HirId, ItemLocalId};
 use ich::Fingerprint;
 use ty::{TyCtxt, Instance, InstanceDef, ParamEnv, ParamEnvAnd, PolyTraitRef, Ty};
 use ty::subst::Substs;
-use rustc_data_structures::stable_hasher::{StableHasher, HashStable};
+use rustc_data_structures::stable_hasher::{StableHasher, HashStable, NoDebugHasher};
 use ich::StableHashingContext;
 use std::fmt;
 use std::hash::Hash;
@@ -679,7 +679,7 @@ impl<'a, 'gcx: 'tcx + 'a, 'tcx: 'a, T> DepNodeParams<'a, 'gcx, 'tcx> for T
 
     default fn to_fingerprint(&self, tcx: TyCtxt<'a, 'gcx, 'tcx>) -> Fingerprint {
         let mut hcx = tcx.create_stable_hashing_context();
-        let mut hasher = StableHasher::new();
+        let mut hasher = NoDebugHasher::new();
 
         self.hash_stable(&mut hcx, &mut hasher);
 
@@ -787,7 +787,7 @@ pub struct WorkProductId {
 
 impl WorkProductId {
     pub fn from_cgu_name(cgu_name: &str) -> WorkProductId {
-        let mut hasher = StableHasher::new();
+        let mut hasher = NoDebugHasher::new();
         cgu_name.len().hash(&mut hasher);
         cgu_name.hash(&mut hasher);
         WorkProductId {

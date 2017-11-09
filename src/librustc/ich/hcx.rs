@@ -31,8 +31,7 @@ use syntax::symbol::Symbol;
 use syntax_pos::Span;
 
 use rustc_data_structures::stable_hasher::{HashStable, StableHashingContextProvider,
-                                           StableHasher, StableHasherResult,
-                                           ToStableHashKey};
+                                           StableHasher, ToStableHashKey};
 use rustc_data_structures::accumulate_vec::AccumulateVec;
 use rustc_data_structures::fx::FxHashSet;
 
@@ -279,9 +278,7 @@ impl<'gcx> ::dep_graph::DepGraphSafe for StableHashingContext<'gcx> {
 
 
 impl<'gcx> HashStable<StableHashingContext<'gcx>> for hir::BodyId {
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          hcx: &mut StableHashingContext<'gcx>,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, hcx: &mut StableHashingContext<'gcx>, hasher: &mut H) {
         if hcx.hash_bodies() {
             hcx.body_resolver.body(*self).hash_stable(hcx, hasher);
         }
@@ -290,9 +287,7 @@ impl<'gcx> HashStable<StableHashingContext<'gcx>> for hir::BodyId {
 
 impl<'gcx> HashStable<StableHashingContext<'gcx>> for hir::HirId {
     #[inline]
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          hcx: &mut StableHashingContext<'gcx>,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, hcx: &mut StableHashingContext<'gcx>, hasher: &mut H) {
         match hcx.node_id_hashing_mode {
             NodeIdHashingMode::Ignore => {
                 // Don't do anything.
@@ -323,9 +318,7 @@ impl<'gcx> ToStableHashKey<StableHashingContext<'gcx>> for hir::HirId {
 }
 
 impl<'gcx> HashStable<StableHashingContext<'gcx>> for ast::NodeId {
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          hcx: &mut StableHashingContext<'gcx>,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, hcx: &mut StableHashingContext<'gcx>, hasher: &mut H) {
         match hcx.node_id_hashing_mode {
             NodeIdHashingMode::Ignore => {
                 // Don't do anything.
@@ -359,9 +352,7 @@ impl<'gcx> HashStable<StableHashingContext<'gcx>> for Span {
     // codepoint offsets. For the purpose of the hash that's sufficient.
     // Also, hashing filenames is expensive so we avoid doing it twice when the
     // span starts and ends in the same file, which is almost always the case.
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          hcx: &mut StableHashingContext<'gcx>,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, hcx: &mut StableHashingContext<'gcx>, hasher: &mut H) {
         use syntax_pos::Pos;
 
         if !hcx.hash_spans {
@@ -423,12 +414,12 @@ impl<'gcx> HashStable<StableHashingContext<'gcx>> for Span {
     }
 }
 
-pub fn hash_stable_trait_impls<'gcx, W, R>(
+pub fn hash_stable_trait_impls<'gcx, R, H>(
     hcx: &mut StableHashingContext<'gcx>,
-    hasher: &mut StableHasher<W>,
+    hasher: &mut H,
     blanket_impls: &Vec<DefId>,
     non_blanket_impls: &HashMap<fast_reject::SimplifiedType, Vec<DefId>, R>)
-    where W: StableHasherResult,
+    where H: StableHasher,
           R: std_hash::BuildHasher,
 {
     {

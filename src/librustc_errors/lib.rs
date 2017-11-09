@@ -34,7 +34,7 @@ use self::Level::*;
 use emitter::{Emitter, EmitterWriter};
 
 use rustc_data_structures::fx::FxHashSet;
-use rustc_data_structures::stable_hasher::StableHasher;
+use rustc_data_structures::stable_hasher::{StableHasher, NoDebugHasher};
 
 use std::borrow::Cow;
 use std::cell::{RefCell, Cell};
@@ -578,9 +578,9 @@ impl Handler {
 
         let diagnostic_hash = {
             use std::hash::Hash;
-            let mut hasher = StableHasher::new();
+            let mut hasher = NoDebugHasher::new();
             diagnostic.hash(&mut hasher);
-            hasher.finish()
+            hasher.finish().to_u128()
         };
 
         // Only emit the diagnostic if we haven't already emitted an equivalent

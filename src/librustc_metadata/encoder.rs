@@ -49,6 +49,8 @@ use rustc::hir::itemlikevisit::ItemLikeVisitor;
 use rustc::hir::intravisit::{Visitor, NestedVisitorMap};
 use rustc::hir::intravisit;
 
+use rustc_data_structures::stable_hasher::StableHasher;
+
 pub struct EncodeContext<'a, 'tcx: 'a> {
     opaque: opaque::Encoder<'a>,
     pub tcx: TyCtxt<'a, 'tcx, 'tcx>,
@@ -244,11 +246,13 @@ impl<'a, 'tcx> EncodeContext<'a, 'tcx> {
 
     // Encodes something that corresponds to a single DepNode::GlobalMetaData
     // and registers the Fingerprint in the `metadata_hashes` map.
-    pub fn tracked<'x, DATA, R>(&'x mut self,
-                                def_index: DefIndex,
-                                op: fn(&mut IsolatedEncoder<'x, 'a, 'tcx>, DATA) -> R,
-                                data: DATA)
-                                -> R {
+    pub fn tracked<'x, DATA, R, H>(&'x mut self,
+                                   def_index: DefIndex,
+                                   op: fn(&mut IsolatedEncoder<'x, 'a, 'tcx, H>, DATA) -> R,
+                                   data: DATA)
+                                   -> R
+        where H: StableHasher
+    {
         let mut entry_builder = IsolatedEncoder::new(self);
         let ret = op(&mut entry_builder, data);
         let (fingerprint, this) = entry_builder.finish();
@@ -473,7 +477,9 @@ impl<'a, 'tcx> EncodeContext<'a, 'tcx> {
 // taking IsolatedEncoder as first argument would be just fine) but by making
 // them methods we don't have to repeat the lengthy `<'a, 'b: 'a, 'tcx: 'b>`
 // clause again and again.
-impl<'a, 'b: 'a, 'tcx: 'b> IsolatedEncoder<'a, 'b, 'tcx> {
+impl<'a, 'b: 'a, 'tcx: 'b, H> IsolatedEncoder<'a, 'b, 'tcx, H>
+    where H: StableHasher
+{
     fn encode_variances_of(&mut self, def_id: DefId) -> LazySeq<ty::Variance> {
         debug!("IsolatedEncoder::encode_variances_of({:?})", def_id);
         let tcx = self.tcx;

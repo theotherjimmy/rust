@@ -54,8 +54,7 @@ use syntax_pos::{DUMMY_SP, Span};
 use rustc_const_math::ConstInt;
 
 use rustc_data_structures::accumulate_vec::IntoIter as AccIntoIter;
-use rustc_data_structures::stable_hasher::{StableHasher, StableHasherResult,
-                                           HashStable};
+use rustc_data_structures::stable_hasher::{StableHasher, HashStable};
 
 use hir;
 
@@ -498,9 +497,7 @@ impl<'tcx> TyS<'tcx> {
 }
 
 impl<'gcx> HashStable<StableHashingContext<'gcx>> for ty::TyS<'gcx> {
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          hcx: &mut StableHashingContext<'gcx>,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, hcx: &mut StableHashingContext<'gcx>, hasher: &mut H) {
         let ty::TyS {
             ref sty,
 
@@ -1298,9 +1295,7 @@ impl<'tcx, T> ParamEnvAnd<'tcx, T> {
 impl<'gcx, T> HashStable<StableHashingContext<'gcx>> for ParamEnvAnd<'gcx, T>
     where T: HashStable<StableHashingContext<'gcx>>
 {
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          hcx: &mut StableHashingContext<'gcx>,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, hcx: &mut StableHashingContext<'gcx>, hasher: &mut H) {
         let ParamEnvAnd {
             ref param_env,
             ref value
@@ -1395,9 +1390,7 @@ impl<'tcx> serialize::UseSpecializedDecodable for &'tcx AdtDef {}
 
 
 impl<'gcx> HashStable<StableHashingContext<'gcx>> for AdtDef {
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          hcx: &mut StableHashingContext<'gcx>,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, hcx: &mut StableHashingContext<'gcx>, hasher: &mut H) {
         let ty::AdtDef {
             did,
             ref variants,

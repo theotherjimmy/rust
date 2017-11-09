@@ -24,8 +24,7 @@ use util::common::ErrorReported;
 use middle::lang_items;
 
 use rustc_const_math::{ConstInt, ConstIsize, ConstUsize};
-use rustc_data_structures::stable_hasher::{StableHasher, StableHasherResult,
-                                           HashStable};
+use rustc_data_structures::stable_hasher::{StableHasher, HashStable, Fingerprint, NoDebugHasher};
 use rustc_data_structures::fx::FxHashMap;
 use std::cmp;
 use std::iter;
@@ -213,7 +212,7 @@ impl<'a, 'tcx> TyCtxt<'a, 'tcx, 'tcx> {
     /// Creates a hash of the type `Ty` which will be the same no matter what crate
     /// context it's calculated within. This is used by the `type_id` intrinsic.
     pub fn type_id_hash(self, ty: Ty<'tcx>) -> u64 {
-        let mut hasher = StableHasher::new();
+        let mut hasher = NoDebugHasher::new();
         let mut hcx = self.create_stable_hashing_context();
 
         // We want the type_id be independent of the types free regions, so we
@@ -226,7 +225,7 @@ impl<'a, 'tcx> TyCtxt<'a, 'tcx, 'tcx> {
                 ty.hash_stable(hcx, &mut hasher);
             });
         });
-        hasher.finish()
+        hasher.finish().to_smaller_hash()
     }
 }
 
@@ -649,19 +648,23 @@ impl<'a, 'gcx, 'tcx> TyCtxt<'a, 'gcx, 'tcx> {
     }
 }
 
-pub struct TypeIdHasher<'a, 'gcx: 'a+'tcx, 'tcx: 'a, W> {
+pub struct TypeIdHasher<'a, 'gcx: 'a+'tcx, 'tcx: 'a, H>
+    where H: StableHasher
+{
     tcx: TyCtxt<'a, 'gcx, 'tcx>,
-    state: StableHasher<W>,
+    state: H,
 }
 
-impl<'a, 'gcx, 'tcx, W> TypeIdHasher<'a, 'gcx, 'tcx, W>
-    where W: StableHasherResult
+impl<'a, 'gcx, 'tcx> TypeIdHasher<'a, 'gcx, 'tcx, NoDebugHasher>
 {
     pub fn new(tcx: TyCtxt<'a, 'gcx, 'tcx>) -> Self {
-        TypeIdHasher { tcx: tcx, state: StableHasher::new() }
+        TypeIdHasher { tcx: tcx, state: NoDebugHasher::new() }
     }
+}
 
-    pub fn finish(self) -> W {
+impl<'a, 'gcx, 'tcx, H: StableHasher> TypeIdHasher<'a, 'gcx, 'tcx, H>
+{
+    pub fn finish(self) -> Fingerprint {
         self.state.finish()
     }
 
@@ -688,8 +691,8 @@ impl<'a, 'gcx, 'tcx, W> TypeIdHasher<'a, 'gcx, 'tcx, W>
     }
 }
 
-impl<'a, 'gcx, 'tcx, W> TypeVisitor<'tcx> for TypeIdHasher<'a, 'gcx, 'tcx, W>
-    where W: StableHasherResult
+impl<'a, 'gcx, 'tcx, H> TypeVisitor<'tcx> for TypeIdHasher<'a, 'gcx, 'tcx, H>
+    where H: StableHasher
 {
     fn visit_ty(&mut self, ty: Ty<'tcx>) -> bool {
         // Distinguish between the Ty variants uniformly.

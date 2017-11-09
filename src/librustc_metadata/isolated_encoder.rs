@@ -15,18 +15,20 @@ use rustc::ich::{StableHashingContext, Fingerprint};
 use rustc::ty::TyCtxt;
 
 use rustc_data_structures::accumulate_vec::AccumulateVec;
-use rustc_data_structures::stable_hasher::{StableHasher, HashStable};
+use rustc_data_structures::stable_hasher::{StableHasher, HashStable, NoDebugHasher};
 use rustc_serialize::Encodable;
 
 /// The IsolatedEncoder provides facilities to write to crate metadata while
 /// making sure that anything going through it is also feed into an ICH hasher.
-pub struct IsolatedEncoder<'a, 'b: 'a, 'tcx: 'b> {
+pub struct IsolatedEncoder<'a, 'b: 'a, 'tcx: 'b, H>
+    where H: StableHasher
+{
     pub tcx: TyCtxt<'b, 'tcx, 'tcx>,
     ecx: &'a mut EncodeContext<'b, 'tcx>,
-    hcx: Option<(StableHashingContext<'tcx>, StableHasher<Fingerprint>)>,
+    hcx: Option<(StableHashingContext<'tcx>, H)>,
 }
 
-impl<'a, 'b: 'a, 'tcx: 'b> IsolatedEncoder<'a, 'b, 'tcx> {
+impl<'a, 'b: 'a, 'tcx: 'b> IsolatedEncoder<'a, 'b, 'tcx, NoDebugHasher> {
 
     pub fn new(ecx: &'a mut EncodeContext<'b, 'tcx>) -> Self {
         let tcx = ecx.tcx;
@@ -45,12 +47,17 @@ impl<'a, 'b: 'a, 'tcx: 'b> IsolatedEncoder<'a, 'b, 'tcx> {
                     tcx.create_stable_hashing_context().force_span_hashing()
                 };
 
-                Some((hcx, StableHasher::new()))
+                Some((hcx, NoDebugHasher::new()))
             } else {
                 None
             }
         }
     }
+}
+
+impl<'a, 'b: 'a, 'tcx: 'b, H> IsolatedEncoder<'a, 'b, 'tcx, H>
+    where H: StableHasher
+{
 
     pub fn finish(self) -> (Option<Fingerprint>, &'a mut EncodeContext<'b, 'tcx>) {
         if let Some((_, hasher)) = self.hcx {

@@ -30,8 +30,7 @@ use syntax_pos::{self, Span};
 use std::marker::PhantomData;
 use std::mem;
 
-use rustc_data_structures::stable_hasher::{StableHasher, HashStable,
-                                           StableHasherResult};
+use rustc_data_structures::stable_hasher::{StableHasher, HashStable};
 
 pub fn rustc_version() -> String {
     format!("rustc {}",
@@ -106,9 +105,7 @@ impl<T> serialize::UseSpecializedEncodable for Lazy<T> {}
 impl<T> serialize::UseSpecializedDecodable for Lazy<T> {}
 
 impl<CTX, T> HashStable<CTX> for Lazy<T> {
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          _: &mut CTX,
-                                          _: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, _: &mut CTX, _: &mut H) {
         // There's nothing to do. Whatever got encoded within this Lazy<>
         // wrapper has already been hashed.
     }
@@ -163,9 +160,7 @@ impl<T> serialize::UseSpecializedEncodable for LazySeq<T> {}
 impl<T> serialize::UseSpecializedDecodable for LazySeq<T> {}
 
 impl<CTX, T> HashStable<CTX> for LazySeq<T> {
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          _: &mut CTX,
-                                          _: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, _: &mut CTX, _: &mut H) {
         // There's nothing to do. Whatever got encoded within this Lazy<>
         // wrapper has already been hashed.
     }
@@ -231,9 +226,7 @@ pub struct TraitImpls {
 }
 
 impl<'gcx> HashStable<StableHashingContext<'gcx>> for TraitImpls {
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          hcx: &mut StableHashingContext<'gcx>,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, hcx: &mut StableHashingContext<'gcx>, hasher: &mut H) {
         let TraitImpls {
             trait_id: (krate, def_index),
             ref impls,
@@ -315,9 +308,7 @@ pub enum EntryKind<'tcx> {
 }
 
 impl<'gcx> HashStable<StableHashingContext<'gcx>> for EntryKind<'gcx> {
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          hcx: &mut StableHashingContext<'gcx>,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, hcx: &mut StableHashingContext<'gcx>, hasher: &mut H) {
         mem::discriminant(self).hash_stable(hcx, hasher);
         match *self {
             EntryKind::ImmStatic        |

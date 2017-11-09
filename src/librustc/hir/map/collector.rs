@@ -18,7 +18,7 @@ use syntax::ast::{NodeId, CRATE_NODE_ID};
 use syntax_pos::Span;
 
 use ich::StableHashingContext;
-use rustc_data_structures::stable_hasher::{HashStable, StableHasher, StableHasherResult};
+use rustc_data_structures::stable_hasher::{HashStable, StableHasher};
 
 /// A Visitor that walks over the HIR and collects Nodes into a HIR map
 pub(super) struct NodeCollector<'a, 'hir> {
@@ -493,9 +493,7 @@ struct HirItemLike<T> {
 impl<'hir, T> HashStable<StableHashingContext<'hir>> for HirItemLike<T>
     where T: HashStable<StableHashingContext<'hir>>
 {
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          hcx: &mut StableHashingContext<'hir>,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, hcx: &mut StableHashingContext<'hir>, hasher: &mut H) {
         hcx.while_hashing_hir_bodies(self.hash_bodies, |hcx| {
             self.item_like.hash_stable(hcx, hasher);
         });

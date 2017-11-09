@@ -18,8 +18,7 @@ use ty::fold::TypeFoldable;
 use ty::{Ty, TyCtxt};
 
 use rustc_data_structures::fx::FxHashMap;
-use rustc_data_structures::stable_hasher::{HashStable, StableHasher,
-                                           StableHasherResult};
+use rustc_data_structures::stable_hasher::{HashStable, StableHasher};
 use std::rc::Rc;
 
 /// A trait's definition with type information.
@@ -187,9 +186,7 @@ pub(super) fn trait_impls_of_provider<'a, 'tcx>(tcx: TyCtxt<'a, 'tcx, 'tcx>,
 }
 
 impl<'gcx> HashStable<StableHashingContext<'gcx>> for TraitImpls {
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          hcx: &mut StableHashingContext<'gcx>,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, hcx: &mut StableHashingContext<'gcx>, hasher: &mut H) {
         let TraitImpls {
             ref blanket_impls,
             ref non_blanket_impls,

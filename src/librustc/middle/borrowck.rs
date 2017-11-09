@@ -12,17 +12,14 @@ use ich::StableHashingContext;
 use hir::HirId;
 use util::nodemap::FxHashSet;
 
-use rustc_data_structures::stable_hasher::{HashStable, StableHasher,
-                                           StableHasherResult};
+use rustc_data_structures::stable_hasher::{HashStable, StableHasher};
 
 pub struct BorrowCheckResult {
     pub used_mut_nodes: FxHashSet<HirId>,
 }
 
 impl<'gcx> HashStable<StableHashingContext<'gcx>> for BorrowCheckResult {
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          hcx: &mut StableHashingContext<'gcx>,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, hcx: &mut StableHashingContext<'gcx>, hasher: &mut H) {
         let BorrowCheckResult {
             ref used_mut_nodes,
         } = *self;

@@ -27,8 +27,7 @@ use std::mem;
 use std::ops::Deref;
 
 use ich::StableHashingContext;
-use rustc_data_structures::stable_hasher::{HashStable, StableHasher,
-                                           StableHasherResult};
+use rustc_data_structures::stable_hasher::{HashStable, StableHasher};
 
 /// Parsed [Data layout](http://llvm.org/docs/LangRef.html#data-layout)
 /// for a target, which contains everything needed to compute layouts.
@@ -2310,9 +2309,7 @@ impl<'a, 'tcx> TyLayout<'tcx> {
 
 impl<'gcx> HashStable<StableHashingContext<'gcx>> for Layout
 {
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          hcx: &mut StableHashingContext<'gcx>,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, hcx: &mut StableHashingContext<'gcx>, hasher: &mut H) {
         use ty::layout::Layout::*;
         mem::discriminant(self).hash_stable(hcx, hasher);
 
@@ -2403,9 +2400,7 @@ impl_stable_hash_for!(struct ::ty::layout::Size {
 
 impl<'gcx> HashStable<StableHashingContext<'gcx>> for LayoutError<'gcx>
 {
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          hcx: &mut StableHashingContext<'gcx>,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, hcx: &mut StableHashingContext<'gcx>, hasher: &mut H) {
         use ty::layout::LayoutError::*;
         mem::discriminant(self).hash_stable(hcx, hasher);
 

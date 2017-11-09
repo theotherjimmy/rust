@@ -12,8 +12,7 @@ use super::OverlapError;
 
 use hir::def_id::DefId;
 use ich::{self, StableHashingContext};
-use rustc_data_structures::stable_hasher::{HashStable, StableHasher,
-                                           StableHasherResult};
+use rustc_data_structures::stable_hasher::{HashStable, StableHasher};
 use traits;
 use ty::{self, TyCtxt, TypeFoldable};
 use ty::fast_reject::{self, SimplifiedType};
@@ -373,9 +372,7 @@ pub fn ancestors(tcx: TyCtxt,
 }
 
 impl<'gcx> HashStable<StableHashingContext<'gcx>> for Children {
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          hcx: &mut StableHashingContext<'gcx>,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, hcx: &mut StableHashingContext<'gcx>, hasher: &mut H) {
         let Children {
             ref nonblanket_impls,
             ref blanket_impls,

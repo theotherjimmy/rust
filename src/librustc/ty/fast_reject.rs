@@ -10,8 +10,7 @@
 
 use hir::def_id::DefId;
 use ich::StableHashingContext;
-use rustc_data_structures::stable_hasher::{StableHasher, StableHasherResult,
-                                           HashStable};
+use rustc_data_structures::stable_hasher::{StableHasher, HashStable};
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::mem;
@@ -153,9 +152,7 @@ impl<'gcx, D> HashStable<StableHashingContext<'gcx>> for SimplifiedTypeGen<D>
     where D: Copy + Debug + Ord + Eq + Hash +
              HashStable<StableHashingContext<'gcx>>,
 {
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          hcx: &mut StableHashingContext<'gcx>,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, hcx: &mut StableHashingContext<'gcx>, hasher: &mut H) {
         mem::discriminant(self).hash_stable(hcx, hasher);
         match *self {
             BoolSimplifiedType |

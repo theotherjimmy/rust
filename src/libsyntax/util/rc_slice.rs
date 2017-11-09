@@ -12,8 +12,7 @@ use std::fmt;
 use std::ops::{Deref, Range};
 use std::rc::Rc;
 
-use rustc_data_structures::stable_hasher::{StableHasher, StableHasherResult,
-                                           HashStable};
+use rustc_data_structures::stable_hasher::{StableHasher, HashStable};
 
 #[derive(Clone)]
 pub struct RcSlice<T> {
@@ -56,9 +55,7 @@ impl<T: fmt::Debug> fmt::Debug for RcSlice<T> {
 impl<CTX, T> HashStable<CTX> for RcSlice<T>
     where T: HashStable<CTX>
 {
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          hcx: &mut CTX,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, hcx: &mut CTX, hasher: &mut H) {
         (**self).hash_stable(hcx, hasher);
     }
 }

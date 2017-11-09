@@ -1437,14 +1437,11 @@ pub fn visibility_to_llvm(linkage: Visibility) -> llvm::Visibility {
 //            for now we content ourselves with providing a no-op HashStable
 //            implementation for CGUs.
 mod temp_stable_hash_impls {
-    use rustc_data_structures::stable_hasher::{StableHasherResult, StableHasher,
-                                               HashStable};
+    use rustc_data_structures::stable_hasher::{StableHasher, HashStable};
     use ModuleTranslation;
 
     impl<HCX> HashStable<HCX> for ModuleTranslation {
-        fn hash_stable<W: StableHasherResult>(&self,
-                                              _: &mut HCX,
-                                              _: &mut StableHasher<W>) {
+        fn hash_stable<H: StableHasher>(&self, _: &mut HCX, _: &mut H) {
             // do nothing
         }
     }

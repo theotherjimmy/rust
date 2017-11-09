@@ -50,8 +50,7 @@ use util::nodemap::{NodeMap, NodeSet, DefIdSet, ItemLocalMap};
 use util::nodemap::{FxHashMap, FxHashSet};
 use rustc_data_structures::accumulate_vec::AccumulateVec;
 use rustc_data_structures::stable_hasher::{HashStable, hash_stable_hashmap,
-                                           StableHasher, StableHasherResult,
-                                           StableVec};
+                                           StableHasher, StableVec};
 use arena::{TypedArena, DroplessArena};
 use rustc_const_math::{ConstInt, ConstUsize};
 use rustc_data_structures::indexed_vec::IndexVec;
@@ -721,9 +720,7 @@ impl<'tcx> TypeckTables<'tcx> {
 }
 
 impl<'gcx> HashStable<StableHashingContext<'gcx>> for TypeckTables<'gcx> {
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          hcx: &mut StableHashingContext<'gcx>,
-                                          hasher: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, hcx: &mut StableHashingContext<'gcx>, hasher: &mut H) {
         let ty::TypeckTables {
             local_id_root,
             ref type_dependent_defs,

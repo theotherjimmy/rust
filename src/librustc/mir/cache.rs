@@ -10,8 +10,7 @@
 
 use std::cell::{Ref, RefCell};
 use rustc_data_structures::indexed_vec::IndexVec;
-use rustc_data_structures::stable_hasher::{HashStable, StableHasher,
-                                           StableHasherResult};
+use rustc_data_structures::stable_hasher::{HashStable, StableHasher};
 use ich::StableHashingContext;
 use mir::{Mir, BasicBlock};
 
@@ -36,9 +35,7 @@ impl serialize::Decodable for Cache {
 }
 
 impl<'gcx> HashStable<StableHashingContext<'gcx>> for Cache {
-    fn hash_stable<W: StableHasherResult>(&self,
-                                          _: &mut StableHashingContext<'gcx>,
-                                          _: &mut StableHasher<W>) {
+    fn hash_stable<H: StableHasher>(&self, _: &mut StableHashingContext<'gcx>, _: &mut H) {
         // do nothing
     }
 }

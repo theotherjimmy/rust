@@ -68,6 +68,8 @@ use syntax::ast;
 
 use std::ops::{Deref, DerefMut};
 
+use rustc_data_structures::stable_hasher::StableHasher;
+
 /// Builder that can encode new items, adding them into the index.
 /// Item encoding cannot be nested.
 pub struct IndexBuilder<'a, 'b: 'a, 'tcx: 'b> {
@@ -113,11 +115,12 @@ impl<'a, 'b, 'tcx> IndexBuilder<'a, 'b, 'tcx> {
     /// holds, and that it is therefore not gaining "secret" access to
     /// bits of HIR or other state that would not be trackd by the
     /// content system.
-    pub fn record<'x, DATA>(&'x mut self,
-                            id: DefId,
-                            op: fn(&mut IsolatedEncoder<'x, 'b, 'tcx>, DATA) -> Entry<'tcx>,
-                            data: DATA)
-        where DATA: DepGraphRead
+    pub fn record<'x, DATA, H>(&'x mut self,
+                               id: DefId,
+                               op: fn(&mut IsolatedEncoder<'x, 'b, 'tcx, H>, DATA) -> Entry<'tcx>,
+                               data: DATA)
+        where DATA: DepGraphRead,
+              H: StableHasher
     {
         assert!(id.is_local());
         let tcx: TyCtxt<'b, 'tcx, 'tcx> = self.ecx.tcx;
